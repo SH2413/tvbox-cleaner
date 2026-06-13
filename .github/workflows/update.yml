@@ -1,0 +1,33 @@
+name: TVBox Auto Cleaner
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Install dependencies
+      run: pip install requests
+
+    - name: Run script
+      run: python tvbox_cleaner.py
+
+    - name: Commit result
+      run: |
+        git config user.name "bot"
+        git config user.email "bot@github.com"
+        git add output/
+        git commit -m "auto update clean sources" || echo "no changes"
+        git push
