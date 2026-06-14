@@ -43,7 +43,7 @@ def multi_check(url):
         if i < RETRY_COUNT - 1:
             time.sleep(INTERVAL)
 
-    return url if success >= 2 else None
+    return url, success
 
 
 def load_sources():
@@ -51,13 +51,13 @@ def load_sources():
         return [i.strip() for i in f if i.strip()]
 
 
-def save(data):
+def save_group(name, data):
     os.makedirs("output", exist_ok=True)
 
-    with open("output/clean.txt", "w", encoding="utf-8") as f:
+    with open(f"output/{name}.txt", "w", encoding="utf-8") as f:
         f.write("\n".join(data))
 
-    with open("output/clean.json", "w", encoding="utf-8") as f:
+    with open(f"output/{name}.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
@@ -65,16 +65,31 @@ def main():
     urls = list(set(load_sources()))
     print(f"检测源数量: {len(urls)}")
 
-    valid = []
+    stable = []
+    normal = []
+    dead = []
 
     with ThreadPoolExecutor(max_workers=10) as pool:
-        for result in pool.map(multi_check, urls):
-            if result:
-                valid.append(result)
+        results = pool.map(multi_check, urls)
 
-    print(f"可用源: {len(valid)}")
+        for url, success in results:
 
-    save(valid)
+            if success >= 2:
+                stable.append(url)
+
+            elif success == 1:
+                normal.append(url)
+
+            else:
+                dead.append(url)
+
+    print(f"稳定源: {len(stable)}")
+    print(f"一般源: {len(normal)}")
+    print(f"废弃源: {len(dead)}")
+
+    save_group("stable", stable)
+    save_group("normal", normal)
+    save_group("dead", dead)
 
 
 if __name__ == "__main__":
