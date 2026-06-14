@@ -26,8 +26,11 @@ jobs:
 
     - name: Commit result
       run: |
-        git config user.name "bot"
-        git config user.email "bot@github.com"
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
         git add output/
-        git commit -m "auto update clean sources" || echo "no changes"
+
+        git commit -m "auto update clean sources" || exit 0
+
         git push
