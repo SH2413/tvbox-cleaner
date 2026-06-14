@@ -14,7 +14,7 @@ HEADERS = {
 }
 
 # =========================
-# 请求原始内容（关键修复点）
+# 获取原始内容
 # =========================
 def fetch_raw(url):
     try:
@@ -27,28 +27,7 @@ def fetch_raw(url):
 
 
 # =========================
-# 入口识别（解决误杀核心）
-# =========================
-def is_entry_source(text):
-    if not text:
-        return False
-
-    keywords = ["sites", "list", "vod", "class", "api", "tv", "json", "http"]
-
-    if text.strip().startswith("{") or text.strip().startswith("["):
-        return True
-
-    text_lower = text.lower()
-
-    for k in keywords:
-        if k in text_lower:
-            return True
-
-    return False
-
-
-# =========================
-# JSON解析（失败不判死）
+# JSON解析
 # =========================
 def try_parse_json(raw):
     try:
@@ -60,7 +39,7 @@ def try_parse_json(raw):
 
 
 # =========================
-# 多仓递归解析（最多3层）
+# 多仓展开（不加分）
 # =========================
 def extract_sources(obj, depth=0):
     urls = []
@@ -86,7 +65,7 @@ def extract_sources(obj, depth=0):
 
 
 # =========================
-# 播放检测（只加分，不判死）
+# 播放检测（用于60分部分）
 # =========================
 def check_play_url(url):
     try:
@@ -110,46 +89,71 @@ def check_play_url(url):
 
 
 # =========================
-# 核心评分逻辑（修复版）
+# ① 抽样播放评分（0~60）
+# =========================
+def play_score(urls):
+    if not urls:
+        return 0
+
+    sample = random.sample(urls, min(5, len(urls)))
+
+    success = 0
+    for u in sample:
+        success += check_play_url(u)
+
+    # 成功比例 → 60分制
+    return int((success / len(sample)) * 60)
+
+
+# =========================
+# ② 稳定性评分（0~40）
+# =========================
+def stability_score(urls):
+    if not urls:
+        return 0
+
+    total = 0
+
+    for _ in range(RETRY_COUNT):
+        sample = random.sample(urls, min(3, len(urls)))
+
+        success = 0
+        for u in sample:
+            success += check_play_url(u)
+
+        total += (success / len(sample)) * 40
+
+    return int(total / RETRY_COUNT)
+
+
+# =========================
+# 单次评分（核心）
 # =========================
 def single_score(api_url):
-    score = 0
-
     raw = fetch_raw(api_url)
-
-    # 🟢 入口源：重点修复误杀饭太硬
-    if is_entry_source(raw):
-        score += 50
 
     data = try_parse_json(raw)
 
-    # 🟡 能解析JSON
-    if data:
-        score += 20
+    if not data:
+        return 0
 
-        urls = extract_sources(data)
+    urls = extract_sources(data)
+    urls = [u for u in urls if u.startswith("http")]
 
-        if urls:
-            score += 10
+    if not urls:
+        return 0
 
-            urls = [u for u in urls if u.startswith("http")]
+    # 🟡 规则1：播放评分（0~60）
+    p_score = play_score(urls)
 
-            if urls:
-                sample = random.sample(urls, min(5, len(urls)))
+    # 🟡 规则2：稳定性评分（0~40）
+    s_score = stability_score(urls)
 
-                success = sum([check_play_url(u) for u in sample])
-
-                # 播放能力加分（不决定生死）
-                score += success * 5
-
-                if success >= 2:
-                    score += 10
-
-    return min(score, 100)
+    return min(p_score + s_score, 100)
 
 
 # =========================
-# 多次评分（稳定性）
+# 多次评分（平均稳定性）
 # =========================
 def multi_score(url):
     scores = []
@@ -169,7 +173,7 @@ def load_sources():
 
 
 # =========================
-# 保存结果
+# 保存
 # =========================
 def save_group(name, data):
     os.makedirs("output", exist_ok=True)
@@ -182,7 +186,7 @@ def save_group(name, data):
 
 
 # =========================
-# 主程序
+# 主流程（严格评分）
 # =========================
 def main():
     urls = list(set(load_sources()))
