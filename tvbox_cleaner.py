@@ -1,28 +1,32 @@
 import requests
 import json
+import random
 from concurrent.futures import ThreadPoolExecutor
 import os
 
-TIMEOUT = 5
+TIMEOUT = 6
 RETRY_COUNT = 3
+MAX_DEPTH = 3  # 🔥最多递归3层
 
 
-# -----------------------------
-# 获取接口数据
-# -----------------------------
-def fetch_api(url):
+HEADERS = {
+    "User-Agent": "Mozilla/5.0",
+    "Referer": "https://www.google.com/"
+}
+
+
+# =========================
+# 获取JSON
+# =========================
+def fetch_json(url):
     try:
-        r = requests.get(url, timeout=TIMEOUT)
+        r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
 
         if r.status_code != 200:
             return None
 
         text = r.text.strip()
 
-        if not text:
-            return None
-
-        # JSON接口
         if text.startswith("{") or text.startswith("["):
             return r.json()
 
@@ -32,47 +36,54 @@ def fetch_api(url):
         return None
 
 
-# -----------------------------
-# 提取播放地址（兼容TVBox常见结构）
-# -----------------------------
-def extract_urls(data):
+# =========================
+# 🔥 多仓递归解析（核心）
+# =========================
+def extract_sources(obj, depth=0):
     urls = []
 
-    try:
-        if isinstance(data, dict):
+    if depth >= MAX_DEPTH:
+        return urls
 
-            # 常见：list / data / vod
-            for key in ["list", "data", "vod"]:
-                if key in data and isinstance(data[key], list):
-                    for item in data[key]:
-                        url = item.get("vod_play_url") or item.get("url")
-                        if url:
-                            urls.append(url)
+    if isinstance(obj, dict):
 
-        elif isinstance(data, list):
-            for item in data:
-                if isinstance(item, dict):
-                    url = item.get("vod_play_url") or item.get("url")
-                    if url:
-                        urls.append(url)
+        for k, v in obj.items():
 
-    except:
-        pass
+            # 发现URL
+            if isinstance(v, str) and v.startswith("http"):
+                urls.append(v)
+
+            # 继续递归
+            urls += extract_sources(v, depth + 1)
+
+    elif isinstance(obj, list):
+
+        for i in obj:
+            urls += extract_sources(i, depth)
+
+    elif isinstance(obj, str):
+
+        if obj.startswith("http"):
+            urls.append(obj)
 
     return urls
 
 
-# -----------------------------
-# 播放地址真实检测
-# -----------------------------
+# =========================
+# 检测播放源
+# =========================
 def check_play_url(url):
     try:
-        r = requests.get(url, timeout=TIMEOUT, stream=True)
+        r = requests.get(
+            url,
+            headers=HEADERS,
+            timeout=TIMEOUT,
+            allow_redirects=True
+        )
 
-        if r.status_code != 200:
+        if r.status_code >= 400:
             return False
 
-        # 有些源返回空或html
         if not r.content:
             return False
 
@@ -82,36 +93,40 @@ def check_play_url(url):
         return False
 
 
-# -----------------------------
-# 单次完整检测
-# -----------------------------
-def single_check(url):
-    data = fetch_api(url)
+# =========================
+# 单次检测
+# =========================
+def single_check(api_url):
+    data = fetch_json(api_url)
 
     if not data:
         return False
 
-    play_urls = extract_urls(data)
+    urls = extract_sources(data)
 
-    if not play_urls:
+    if not urls:
         return False
 
-    # 只抽样检测前2个播放地址
-    test_urls = play_urls[:2]
+    urls = [u for u in urls if u.startswith("http")]
+
+    if not urls:
+        return False
+
+    # 随机抽样（避免误杀）
+    sample = random.sample(urls, min(5, len(urls)))
 
     success = 0
 
-    for u in test_urls:
+    for u in sample:
         if check_play_url(u):
             success += 1
 
-    return success > 0
+    return success >= 1
 
 
-# -----------------------------
-# 多次检测（核心规则）
-# ≥2次成功才算可用
-# -----------------------------
+# =========================
+# 多次检测
+# =========================
 def multi_check(url):
     success = 0
 
@@ -122,17 +137,17 @@ def multi_check(url):
     return url, success
 
 
-# -----------------------------
+# =========================
 # 读取源
-# -----------------------------
+# =========================
 def load_sources():
     with open("sources.txt", "r", encoding="utf-8") as f:
         return [i.strip() for i in f if i.strip()]
 
 
-# -----------------------------
-# 保存结果
-# -----------------------------
+# =========================
+# 保存
+# =========================
 def save_group(name, data):
     os.makedirs("output", exist_ok=True)
 
@@ -143,16 +158,14 @@ def save_group(name, data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-# -----------------------------
+# =========================
 # 主程序
-# -----------------------------
+# =========================
 def main():
     urls = list(set(load_sources()))
     print(f"检测源数量: {len(urls)}")
 
-    stable = []
-    normal = []
-    dead = []
+    stable, normal, dead = [], [], []
 
     with ThreadPoolExecutor(max_workers=10) as pool:
         results = pool.map(multi_check, urls)
