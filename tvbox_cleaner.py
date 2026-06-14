@@ -13,56 +13,54 @@ HEADERS = {
     "Referer": "https://www.google.com/"
 }
 
-
 # =========================
-# 请求JSON
+# 请求原始内容（关键修复点）
 # =========================
-def fetch_json(url):
+def fetch_raw(url):
     try:
         r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
-
         if r.status_code != 200:
             return None
-
-        text = r.text.strip()
-
-        if text.startswith("{") or text.startswith("["):
-            return r.json()
-
-        return None
-
+        return r.text
     except:
         return None
 
 
 # =========================
-# 🔥 入口识别（核心修复）
+# 入口识别（解决误杀核心）
 # =========================
-def is_entry_source(data):
+def is_entry_source(text):
+    if not text:
+        return False
+
+    keywords = ["sites", "list", "vod", "class", "api", "tv", "json", "http"]
+
+    if text.strip().startswith("{") or text.strip().startswith("["):
+        return True
+
+    text_lower = text.lower()
+
+    for k in keywords:
+        if k in text_lower:
+            return True
+
+    return False
+
+
+# =========================
+# JSON解析（失败不判死）
+# =========================
+def try_parse_json(raw):
     try:
-        if isinstance(data, dict):
-
-            keys = data.keys()
-
-            # TVBox典型入口特征
-            entry_keys = ["sites", "list", "class", "urls", "vod"]
-
-            for k in entry_keys:
-                if k in keys:
-                    return True
-
-            # 结构复杂也认为是入口
-            if len(keys) >= 3:
-                return True
-
-        return False
-
+        if raw and (raw.strip().startswith("{") or raw.strip().startswith("[")):
+            return json.loads(raw)
     except:
-        return False
+        pass
+    return None
 
 
 # =========================
-# 多仓递归解析
+# 多仓递归解析（最多3层）
 # =========================
 def extract_sources(obj, depth=0):
     urls = []
@@ -72,10 +70,8 @@ def extract_sources(obj, depth=0):
 
     if isinstance(obj, dict):
         for k, v in obj.items():
-
             if isinstance(v, str) and v.startswith("http"):
                 urls.append(v)
-
             urls += extract_sources(v, depth + 1)
 
     elif isinstance(obj, list):
@@ -90,7 +86,7 @@ def extract_sources(obj, depth=0):
 
 
 # =========================
-# 播放检测（降权用）
+# 播放检测（只加分，不判死）
 # =========================
 def check_play_url(url):
     try:
@@ -114,41 +110,46 @@ def check_play_url(url):
 
 
 # =========================
-# 单次评分（修复版）
+# 核心评分逻辑（修复版）
 # =========================
 def single_score(api_url):
     score = 0
 
-    data = fetch_json(api_url)
-    if not data:
-        return 0
+    raw = fetch_raw(api_url)
 
-    # 🟢 关键：入口源直接加分（解决饭太硬误杀）
-    if is_entry_source(data):
-        score += 40
+    # 🟢 入口源：重点修复误杀饭太硬
+    if is_entry_source(raw):
+        score += 50
 
-    urls = extract_sources(data)
+    data = try_parse_json(raw)
 
-    if urls:
+    # 🟡 能解析JSON
+    if data:
         score += 20
 
-    urls = [u for u in urls if u.startswith("http")]
+        urls = extract_sources(data)
 
-    if urls:
-        sample = random.sample(urls, min(5, len(urls)))
+        if urls:
+            score += 10
 
-        success = sum([check_play_url(u) for u in sample])
+            urls = [u for u in urls if u.startswith("http")]
 
-        score += success * 10
+            if urls:
+                sample = random.sample(urls, min(5, len(urls)))
 
-        if success >= 2:
-            score += 20
+                success = sum([check_play_url(u) for u in sample])
+
+                # 播放能力加分（不决定生死）
+                score += success * 5
+
+                if success >= 2:
+                    score += 10
 
     return min(score, 100)
 
 
 # =========================
-# 多次评分
+# 多次评分（稳定性）
 # =========================
 def multi_score(url):
     scores = []
@@ -168,7 +169,7 @@ def load_sources():
 
 
 # =========================
-# 保存
+# 保存结果
 # =========================
 def save_group(name, data):
     os.makedirs("output", exist_ok=True)
@@ -181,7 +182,7 @@ def save_group(name, data):
 
 
 # =========================
-# 主流程
+# 主程序
 # =========================
 def main():
     urls = list(set(load_sources()))
