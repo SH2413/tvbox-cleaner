@@ -39,7 +39,7 @@ def try_parse_json(raw):
 
 
 # =========================
-# 多仓展开（不做惩罚）
+# 多仓展开（不扣分）
 # =========================
 def extract_sources(obj, depth=0):
     urls = []
@@ -65,7 +65,7 @@ def extract_sources(obj, depth=0):
 
 
 # =========================
-# 播放检测（只加分不扣分）
+# 播放检测（只判断成功/失败）
 # =========================
 def check_play_url(url):
     try:
@@ -86,22 +86,21 @@ def check_play_url(url):
 
 
 # =========================
-# 播放评分（0~60，加分制）
+# 播放评分（0~60 → 改为10个抽样）
 # =========================
 def play_score(urls):
     if not urls:
         return 0
 
-    sample = random.sample(urls, min(5, len(urls)))
+    sample = random.sample(urls, min(10, len(urls)))  # ✔ 改这里：10个
 
     success = sum([check_play_url(u) for u in sample])
 
-    # 👉 成功比例换算（不惩罚失败）
     return int((success / len(sample)) * 60)
 
 
 # =========================
-# 稳定性评分（0~40，加分制）
+# 稳定性评分（0~40）
 # =========================
 def stability_score(urls):
     if not urls:
@@ -119,7 +118,7 @@ def stability_score(urls):
 
 
 # =========================
-# 单次评分（核心）
+# 单源评分
 # =========================
 def single_score(api_url):
     score = 0
@@ -127,32 +126,25 @@ def single_score(api_url):
     raw = fetch_raw(api_url)
     data = try_parse_json(raw)
 
-    # 🟢 只要能访问就给基础分（防误杀核心）
     if raw:
         score += 30
 
-    # 🟡 JSON结构加分
     if data:
         score += 20
 
     urls = extract_sources(data) if data else []
     urls = [u for u in urls if u.startswith("http")]
 
-    # 🟡 有播放结构加分
     if urls:
         score += 10
-
-        # 🟡 播放能力（加分制）
         score += play_score(urls)
-
-        # 🟡 稳定性（加分制）
         score += stability_score(urls)
 
     return min(score, 100)
 
 
 # =========================
-# 多次评分（平均稳定）
+# 多次评分
 # =========================
 def multi_score(url):
     scores = []
@@ -172,7 +164,7 @@ def load_sources():
 
 
 # =========================
-# 保存结果（无POOR）
+# 保存
 # =========================
 def save_group(name, data):
     os.makedirs("output", exist_ok=True)
@@ -185,7 +177,7 @@ def save_group(name, data):
 
 
 # =========================
-# 主流程（容错版）
+# 主流程（按新分级）
 # =========================
 def main():
     urls = list(set(load_sources()))
@@ -200,10 +192,11 @@ def main():
 
         for url, score in results:
 
-            if score >= 80:
+            # ✔ 按你新规则
+            if score >= 61:
                 stable.append((url, score))
 
-            elif score >= 50:
+            elif score >= 31:
                 normal.append((url, score))
 
             else:
