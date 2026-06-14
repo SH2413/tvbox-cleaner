@@ -6,14 +6,12 @@ import os
 
 TIMEOUT = 6
 RETRY_COUNT = 3
-MAX_DEPTH = 3  # 🔥最多递归3层
-
+MAX_DEPTH = 3
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Referer": "https://www.google.com/"
 }
-
 
 # =========================
 # 获取JSON
@@ -37,7 +35,7 @@ def fetch_json(url):
 
 
 # =========================
-# 🔥 多仓递归解析（核心）
+# 多仓递归解析
 # =========================
 def extract_sources(obj, depth=0):
     urls = []
@@ -46,23 +44,16 @@ def extract_sources(obj, depth=0):
         return urls
 
     if isinstance(obj, dict):
-
         for k, v in obj.items():
-
-            # 发现URL
             if isinstance(v, str) and v.startswith("http"):
                 urls.append(v)
-
-            # 继续递归
             urls += extract_sources(v, depth + 1)
 
     elif isinstance(obj, list):
-
         for i in obj:
             urls += extract_sources(i, depth)
 
     elif isinstance(obj, str):
-
         if obj.startswith("http"):
             urls.append(obj)
 
@@ -70,7 +61,7 @@ def extract_sources(obj, depth=0):
 
 
 # =========================
-# 检测播放源
+# 播放检测（轻量）
 # =========================
 def check_play_url(url):
     try:
@@ -82,35 +73,43 @@ def check_play_url(url):
         )
 
         if r.status_code >= 400:
-            return False
+            return 0
 
         if not r.content:
-            return False
+            return 0
 
-        return True
+        # m3u8 / ts / mp4加分
+        if "m3u8" in url or "ts" in url or "mp4" in url:
+            return 1
+
+        return 1
 
     except:
-        return False
+        return 0
 
 
 # =========================
-# 单次检测
+# 单次评分（核心）
 # =========================
-def single_check(api_url):
+def single_score(api_url):
+    score = 0
+
     data = fetch_json(api_url)
-
     if not data:
-        return False
+        return 0
+
+    score += 20  # 接口可访问
 
     urls = extract_sources(data)
-
     if not urls:
-        return False
+        return score
+
+    score += 20  # 能解析播放结构
 
     urls = [u for u in urls if u.startswith("http")]
 
     if not urls:
-        return False
+        return score
 
     # 随机抽样（避免误杀）
     sample = random.sample(urls, min(5, len(urls)))
@@ -118,23 +117,32 @@ def single_check(api_url):
     success = 0
 
     for u in sample:
-        if check_play_url(u):
-            success += 1
+        success += check_play_url(u)
 
-    return success >= 1
+    # 播放成功加分
+    score += success * 15  # 最多30分
+
+    # 稳定性加分（轻量模拟）
+    if success >= 2:
+        score += 30
+    elif success == 1:
+        score += 15
+
+    return min(score, 100)
 
 
 # =========================
-# 多次检测
+# 多次评分（稳定性）
 # =========================
-def multi_check(url):
-    success = 0
+def multi_score(url):
+    scores = []
 
     for _ in range(RETRY_COUNT):
-        if single_check(url):
-            success += 1
+        scores.append(single_score(url))
 
-    return url, success
+    final_score = sum(scores) / len(scores)
+
+    return url, final_score
 
 
 # =========================
@@ -146,48 +154,56 @@ def load_sources():
 
 
 # =========================
-# 保存
+# 保存分类
 # =========================
 def save_group(name, data):
     os.makedirs("output", exist_ok=True)
 
     with open(f"output/{name}.txt", "w", encoding="utf-8") as f:
-        f.write("\n".join(data))
+        f.write("\n".join([d[0] for d in data]))
 
     with open(f"output/{name}.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 # =========================
-# 主程序
+# 主程序（评分分级）
 # =========================
 def main():
     urls = list(set(load_sources()))
     print(f"检测源数量: {len(urls)}")
 
-    stable, normal, dead = [], [], []
+    stable = []
+    normal = []
+    weak = []
+    poor = []
 
     with ThreadPoolExecutor(max_workers=10) as pool:
-        results = pool.map(multi_check, urls)
+        results = pool.map(multi_score, urls)
 
-        for url, success in results:
+        for url, score in results:
 
-            if success >= 2:
-                stable.append(url)
+            if score >= 80:
+                stable.append((url, score))
 
-            elif success == 1:
-                normal.append(url)
+            elif score >= 50:
+                normal.append((url, score))
+
+            elif score >= 20:
+                weak.append((url, score))
 
             else:
-                dead.append(url)
+                poor.append((url, score))
 
     print(f"稳定源: {len(stable)}")
     print(f"一般源: {len(normal)}")
-    print(f"废弃源: {len(dead)}")
+    print(f"弱源: {len(weak)}")
+    print(f"废弃源: {len(poor)}")
 
     save_group("stable", stable)
     save_group("normal", normal)
-    save_group("dead", dead)
+    save_group("weak", weak)
+    save_group("poor", poor)
 
 
 if __name__ == "__main__":
