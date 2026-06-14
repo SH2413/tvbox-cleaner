@@ -13,8 +13,9 @@ HEADERS = {
     "Referer": "https://www.google.com/"
 }
 
+
 # =========================
-# 获取JSON
+# 请求JSON
 # =========================
 def fetch_json(url):
     try:
@@ -35,6 +36,32 @@ def fetch_json(url):
 
 
 # =========================
+# 🔥 入口识别（核心修复）
+# =========================
+def is_entry_source(data):
+    try:
+        if isinstance(data, dict):
+
+            keys = data.keys()
+
+            # TVBox典型入口特征
+            entry_keys = ["sites", "list", "class", "urls", "vod"]
+
+            for k in entry_keys:
+                if k in keys:
+                    return True
+
+            # 结构复杂也认为是入口
+            if len(keys) >= 3:
+                return True
+
+        return False
+
+    except:
+        return False
+
+
+# =========================
 # 多仓递归解析
 # =========================
 def extract_sources(obj, depth=0):
@@ -45,8 +72,10 @@ def extract_sources(obj, depth=0):
 
     if isinstance(obj, dict):
         for k, v in obj.items():
+
             if isinstance(v, str) and v.startswith("http"):
                 urls.append(v)
+
             urls += extract_sources(v, depth + 1)
 
     elif isinstance(obj, list):
@@ -61,7 +90,7 @@ def extract_sources(obj, depth=0):
 
 
 # =========================
-# 播放检测（轻量）
+# 播放检测（降权用）
 # =========================
 def check_play_url(url):
     try:
@@ -78,10 +107,6 @@ def check_play_url(url):
         if not r.content:
             return 0
 
-        # m3u8 / ts / mp4加分
-        if "m3u8" in url or "ts" in url or "mp4" in url:
-            return 1
-
         return 1
 
     except:
@@ -89,7 +114,7 @@ def check_play_url(url):
 
 
 # =========================
-# 单次评分（核心）
+# 单次评分（修复版）
 # =========================
 def single_score(api_url):
     score = 0
@@ -98,41 +123,32 @@ def single_score(api_url):
     if not data:
         return 0
 
-    score += 20  # 接口可访问
+    # 🟢 关键：入口源直接加分（解决饭太硬误杀）
+    if is_entry_source(data):
+        score += 40
 
     urls = extract_sources(data)
-    if not urls:
-        return score
 
-    score += 20  # 能解析播放结构
+    if urls:
+        score += 20
 
     urls = [u for u in urls if u.startswith("http")]
 
-    if not urls:
-        return score
+    if urls:
+        sample = random.sample(urls, min(5, len(urls)))
 
-    # 随机抽样（避免误杀）
-    sample = random.sample(urls, min(5, len(urls)))
+        success = sum([check_play_url(u) for u in sample])
 
-    success = 0
+        score += success * 10
 
-    for u in sample:
-        success += check_play_url(u)
-
-    # 播放成功加分
-    score += success * 15  # 最多30分
-
-    # 稳定性加分（轻量模拟）
-    if success >= 2:
-        score += 30
-    elif success == 1:
-        score += 15
+        if success >= 2:
+            score += 20
 
     return min(score, 100)
 
 
 # =========================
-# 多次评分（稳定性）
+# 多次评分
 # =========================
 def multi_score(url):
     scores = []
@@ -140,9 +156,7 @@ def multi_score(url):
     for _ in range(RETRY_COUNT):
         scores.append(single_score(url))
 
-    final_score = sum(scores) / len(scores)
-
-    return url, final_score
+    return url, sum(scores) / len(scores)
 
 
 # =========================
@@ -154,7 +168,7 @@ def load_sources():
 
 
 # =========================
-# 保存分类
+# 保存
 # =========================
 def save_group(name, data):
     os.makedirs("output", exist_ok=True)
@@ -167,7 +181,7 @@ def save_group(name, data):
 
 
 # =========================
-# 主程序（评分分级）
+# 主流程
 # =========================
 def main():
     urls = list(set(load_sources()))
