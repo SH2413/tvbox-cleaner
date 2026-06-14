@@ -39,7 +39,7 @@ def try_parse_json(raw):
 
 
 # =========================
-# 多仓展开（不加分）
+# 多仓展开（不做惩罚）
 # =========================
 def extract_sources(obj, depth=0):
     urls = []
@@ -65,7 +65,7 @@ def extract_sources(obj, depth=0):
 
 
 # =========================
-# 播放检测（用于60分部分）
+# 播放检测（只加分不扣分）
 # =========================
 def check_play_url(url):
     try:
@@ -76,20 +76,17 @@ def check_play_url(url):
             allow_redirects=True
         )
 
-        if r.status_code >= 400:
-            return 0
+        if r.status_code < 400 and r.content:
+            return 1
 
-        if not r.content:
-            return 0
-
-        return 1
+        return 0
 
     except:
         return 0
 
 
 # =========================
-# ① 抽样播放评分（0~60）
+# 播放评分（0~60，加分制）
 # =========================
 def play_score(urls):
     if not urls:
@@ -97,16 +94,14 @@ def play_score(urls):
 
     sample = random.sample(urls, min(5, len(urls)))
 
-    success = 0
-    for u in sample:
-        success += check_play_url(u)
+    success = sum([check_play_url(u) for u in sample])
 
-    # 成功比例 → 60分制
+    # 👉 成功比例换算（不惩罚失败）
     return int((success / len(sample)) * 60)
 
 
 # =========================
-# ② 稳定性评分（0~40）
+# 稳定性评分（0~40，加分制）
 # =========================
 def stability_score(urls):
     if not urls:
@@ -116,12 +111,9 @@ def stability_score(urls):
 
     for _ in range(RETRY_COUNT):
         sample = random.sample(urls, min(3, len(urls)))
+        success = sum([check_play_url(u) for u in sample])
 
-        success = 0
-        for u in sample:
-            success += check_play_url(u)
-
-        total += (success / len(sample)) * 40
+        total += int((success / len(sample)) * 40)
 
     return int(total / RETRY_COUNT)
 
@@ -130,30 +122,37 @@ def stability_score(urls):
 # 单次评分（核心）
 # =========================
 def single_score(api_url):
-    raw = fetch_raw(api_url)
+    score = 0
 
+    raw = fetch_raw(api_url)
     data = try_parse_json(raw)
 
-    if not data:
-        return 0
+    # 🟢 只要能访问就给基础分（防误杀核心）
+    if raw:
+        score += 30
 
-    urls = extract_sources(data)
+    # 🟡 JSON结构加分
+    if data:
+        score += 20
+
+    urls = extract_sources(data) if data else []
     urls = [u for u in urls if u.startswith("http")]
 
-    if not urls:
-        return 0
+    # 🟡 有播放结构加分
+    if urls:
+        score += 10
 
-    # 🟡 规则1：播放评分（0~60）
-    p_score = play_score(urls)
+        # 🟡 播放能力（加分制）
+        score += play_score(urls)
 
-    # 🟡 规则2：稳定性评分（0~40）
-    s_score = stability_score(urls)
+        # 🟡 稳定性（加分制）
+        score += stability_score(urls)
 
-    return min(p_score + s_score, 100)
+    return min(score, 100)
 
 
 # =========================
-# 多次评分（平均稳定性）
+# 多次评分（平均稳定）
 # =========================
 def multi_score(url):
     scores = []
@@ -173,7 +172,7 @@ def load_sources():
 
 
 # =========================
-# 保存
+# 保存结果（无POOR）
 # =========================
 def save_group(name, data):
     os.makedirs("output", exist_ok=True)
@@ -186,7 +185,7 @@ def save_group(name, data):
 
 
 # =========================
-# 主流程（严格评分）
+# 主流程（容错版）
 # =========================
 def main():
     urls = list(set(load_sources()))
@@ -195,7 +194,6 @@ def main():
     stable = []
     normal = []
     weak = []
-    poor = []
 
     with ThreadPoolExecutor(max_workers=10) as pool:
         results = pool.map(multi_score, urls)
@@ -208,21 +206,16 @@ def main():
             elif score >= 50:
                 normal.append((url, score))
 
-            elif score >= 20:
+            else:
                 weak.append((url, score))
 
-            else:
-                poor.append((url, score))
-
     print(f"稳定源: {len(stable)}")
-    print(f"一般源: {len(normal)}")
+    print(f"可用源: {len(normal)}")
     print(f"弱源: {len(weak)}")
-    print(f"废弃源: {len(poor)}")
 
     save_group("stable", stable)
     save_group("normal", normal)
     save_group("weak", weak)
-    save_group("poor", poor)
 
 
 if __name__ == "__main__":
