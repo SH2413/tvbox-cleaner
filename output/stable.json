@@ -1,30 +1,10 @@
 [
   [
-    "https://qist.wyfc.qzz.io/xiaosa/api.json",
-    99.33333333333333
+    "https://bitbucket.org/xduo/duoapi/raw/master/xpg.json",
+    64.0
   ],
   [
-    "https://9280.kstore.space/newwex.json",
-    100.0
-  ],
-  [
-    "http://zhangqun1818.serv00.net/zq/api.json",
-    78.0
-  ],
-  [
-    "https://16409.kstore.vip/tv/ngzmods.json",
-    100.0
-  ],
-  [
-    "https://cyuan.netlify.app/tvbox/duo.json",
-    89.33333333333333
-  ],
-  [
-    "https://盒子迷.top/禁止贩卖",
-    86.66666666666667
-  ],
-  [
-    "https://9280.kstore.vip/newwex.json",
+    "https://raw.githubusercontent.com/qist/tvbox/master/jsm.json",
     100.0
   ],
   [
@@ -32,23 +12,15 @@
     100.0
   ],
   [
-    "http://rihou.cc:555/nzk/nzk0722.json",
+    "https://gitlab.com/noimank/tvbox/-/raw/main/tvbox1.json",
     100.0
   ],
   [
-    "https://9280.kstore.space/wex.json",
-    96.33333333333333
+    "https://盒子迷.top/禁止贩卖",
+    81.33333333333333
   ],
   [
-    "http://宝盒接口.top",
-    100.0
-  ],
-  [
-    "https://jihulab.com/duomv/apps/-/raw/main/fast.json",
-    100.0
-  ],
-  [
-    "https://gh-proxy.com/https://raw.githubusercontent.com/guot55/yg/main/pg/bh.json",
+    "https://gitlab.com/duomv/dzhipy/-/raw/main/index.json",
     100.0
   ],
   [
@@ -57,54 +29,38 @@
   ],
   [
     "http://ztha.top/TVBox/GYCK.json",
-    95.33333333333333
+    90.0
   ],
   [
-    "http://124.223.214.31:8/api.json",
+    "https://gh-proxy.com/https://raw.githubusercontent.com/guot55/yg/main/pg/bh.json",
     100.0
-  ],
-  [
-    "https://gh-proxy.com/raw.githubusercontent.com/yw88075/tvbox/main/yw.json",
-    100.0
-  ],
-  [
-    "https://qist.wyfc.qzz.io/jsm.json",
-    99.66666666666667
-  ],
-  [
-    "http://fmys.top/fmys.json",
-    100.0
-  ],
-  [
-    "https://clun.top/box.json",
-    99.0
-  ],
-  [
-    "https://gitlab.com/noimank/tvbox/-/raw/main/tvbox1.json",
-    100.0
-  ],
-  [
-    "https://gh-proxy.com/https://raw.githubusercontent.com/gaotianliuyun/gao/master/js.json",
-    97.33333333333333
   ],
   [
     "https://tv.203511.xyz/0821.json",
     100.0
   ],
   [
-    "https://pastebin.com/raw/sbPpDm9G",
-    94.33333333333333
+    "https://9280.kstore.space/newwex.json",
+    100.0
   ],
   [
-    "https://bitbucket.org/xduo/duoapi/raw/master/xpg.json",
-    67.33333333333333
+    "https://9280.kstore.space/wex.json",
+    93.33333333333333
   ],
   [
-    "https://raw.githubusercontent.com/qist/tvbox/master/jsm.json",
-    99.33333333333333
+    "http://fmys.top/fmys.json",
+    98.0
   ],
   [
-    "https://gitlab.com/duomv/dzhipy/-/raw/main/index.json",
+    "http://124.223.214.31:8/api.json",
+    100.0
+  ],
+  [
+    "http://home.jundie.top:81/top98.json",
+    87.0
+  ],
+  [
+    "http://宝盒接口.top",
     100.0
   ],
   [
@@ -112,7 +68,55 @@
     100.0
   ],
   [
-    "http://home.jundie.top:81/top98.json",
-    75.66666666666667
+    "https://pastebin.com/raw/sbPpDm9G",
+    97.0
+  ],
+  [
+    "https://9280.kstore.vip/newwex.json",
+    97.0
+  ],
+  [
+    "https://qist.wyfc.qzz.io/jsm.json",
+    100.0
+  ],
+  [
+    "http://rihou.cc:555/nzk/nzk0722.json",
+    100.0
+  ],
+  [
+    "https://qist.wyfc.qzz.io/xiaosa/api.json",
+    96.0
+  ],
+  [
+    "https://jihulab.com/duomv/apps/-/raw/main/fast.json",
+    100.0
+  ],
+  [
+    "http://zhangqun1818.serv00.net/zq/api.json",
+    79.33333333333333
+  ],
+  [
+    "https://gh-proxy.com/https://raw.githubusercontent.com/gaotianliuyun/gao/master/js.json",
+    98.33333333333333
+  ],
+  [
+    "https://clun.top/box.json",
+    100.0
+  ],
+  [
+    "https://gh-proxy.com/raw.githubusercontent.com/yw88075/tvbox/main/yw.json",
+    97.33333333333333
+  ],
+  [
+    "https://cyuan.netlify.app/tvbox/duo.json",
+    89.0
+  ],
+  [
+    "https://6492.kstore.space/xnf/xnf.json",
+    100.0
+  ],
+  [
+    "https://16409.kstore.vip/tv/ngzmods.json",
+    100.0
   ]
 ]
